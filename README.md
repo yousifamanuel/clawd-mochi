@@ -5,15 +5,13 @@
 
 # Clawd Mochi 🦀🤖
 
-A physical desk companion inspired by **Clawd** — the pixel-crab mascot of Claude Code by Anthropic. An ESP32-C3 drives a 1.54" color TFT display and hosts a mobile web controller — no app, no internet, no cloud required.
+A physical desk companion inspired by **Clawd** — the pixel-crab mascot of Claude Code by Anthropic. An ESP32-C3 drives a 1.54" color TFT display and shows you what Claude is doing at a glance.
 
-**Cost: ~$6–8 · Build time: ~1 hour · Skill level: Beginner**
-
-📦 3D printable case on MakerWorld: [https://makerworld.com/en/models/2559505-clawd-mochi-physical-claude-code-mascot#profileId-2820000](https://makerworld.com/en/models/2559505-clawd-mochi-physical-claude-code-mascot#profileId-2820000)
+**Cost: ~$6-8 · Build time: ~1 hour · Skill level: Beginner**
 
 ---
 
-> ⚠️ This is an independent fan project. It is not affiliated with, sponsored by, or endorsed by Anthropic. "Claude" and "Clawd" are trademarks of Anthropic.
+> This is an independent fan project. It is not affiliated with, sponsored by, or endorsed by Anthropic. "Claude" and "Clawd" are trademarks of Anthropic.
 
 ---
 
@@ -25,207 +23,167 @@ A physical desk companion inspired by **Clawd** — the pixel-crab mascot of Cla
 
 ## What it does
 
-Clawd Mochi sits on your desk and shows animated expressions on a small color display. You control it from any phone or browser by connecting to its built-in WiFi hotspot:
+Clawd Mochi sits next to your monitor, plugged in via USB, and acts as a **status indicator for Claude Code**. Using Claude Code hooks, it detects what Claude is doing and shows a matching facial expression:
 
-- **Normal eyes** — pixel-art square eyes with wiggle and blink animations
-- **Squish eyes** — `> <` happy squint with open/close animation
-- **Claude Code** — displays "Claude Code" with an interactive terminal
-- **Canvas** — draw anything on the display from your phone in real time
+| State | Expression | When |
+|---|---|---|
+| **Working** | Scanning eyes (L/R wiggle) | Claude is running tools or generating |
+| **Attention** | Happy squish eyes (> <) with blink | Claude finished — needs your input |
+| **Inactive** | Sleepy half-closed eyes + dim | No activity for a while |
 
----
+### How it works
+
+```
+Claude Code ──hooks──▶ clawd_hook.sh ──socket──▶ clawd_daemon.py ──serial──▶ ESP32
+```
+
+1. **Claude Code hooks** fire on tool use, prompt submit, and response completion
+2. A lightweight **hook script** sends the state to a background daemon via Unix socket
+3. The **Python daemon** forwards commands to the ESP32 over USB serial
+4. The **ESP32 firmware** animates the matching facial expression on the display
 
 ## Parts list
 
-| Part                | Spec                             | ~Price |
-| ------------------- | -------------------------------- | ------ |
-| ESP32-C3 Super Mini | microcontroller with WiFi        | ~$2.50 |
-| ST7789 1.54" TFT    | 240×240 SPI color display        | ~$3.00 |
-| 8 short wires       | 8–10 cm Dupont / jumper wires    | ~$0.50 |
-| 2× M2×6mm screws    | to mount display bezel           | ~$0.10 |
-| Double-sided tape   | to secure components inside case | ~$0.10 |
-| USB-C cable         | for power                        | —      |
-| 3D printed case     | PLA or PETG, ~30g                | ~$0.50 |
+| Part | ~Cost |
+|---|---|
+| ESP32-C3 Super Mini | $2.50 |
+| ST7789 1.54" TFT (240x240, SPI) | $3.00 |
+| 8x jumper wires (8-10 cm) | $0.50 |
+| 3D printed case | ~$1.00 |
 
-**Total: ~$7–8**
-
----
+**Total: ~$6-8**
 
 ## Wiring
 
-> ⚠️ Connect VCC to **3.3V only** — never 5V. Use GPIO 8 and 10 for SPI (hardware SPI, fast). Do not use GPIO 6/7 for SPI.
+| Display Pin | ESP32-C3 GPIO | Purpose |
+|---|---|---|
+| VCC | 3V3 | Power (3.3V ONLY) |
+| GND | GND | Ground |
+| SDA | GPIO 10 | MOSI (hardware SPI) |
+| SCL | GPIO 8 | SCK (hardware SPI) |
+| RES | GPIO 2 | Reset |
+| DC | GPIO 1 | Data/Command |
+| CS | GPIO 4 | Chip select |
+| BL | GPIO 3 | Backlight (PWM) |
 
-| Display pin | ESP32-C3 GPIO  | Wire color (suggested) |
-| ----------- | -------------- | ---------------------- |
-| VCC         | 3V3            | Red                    |
-| GND         | GND            | Black                  |
-| SDA         | GPIO 10 (MOSI) | Orange                 |
-| SCL         | GPIO 8 (SCK)   | Green                  |
-| RES         | GPIO 2         | Purple                 |
-| DC          | GPIO 1         | Blue                   |
-| CS          | GPIO 4         | White                  |
-| BL          | GPIO 3         | Yellow                 |
+## Setup
 
----
+### 1. Flash the ESP32 firmware
 
-## Software setup
+**Requirements:** Arduino IDE 2.x
 
-### Step 1 — Install Arduino IDE
+1. Add ESP32 board support:
+   - File → Preferences → Additional Board URLs: `https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json`
+   - Tools → Board Manager → Install "esp32 by Espressif Systems"
 
-Download [Arduino IDE 2.x](https://www.arduino.cc/en/software) and install it.
+2. Install libraries (Library Manager):
+   - Adafruit GFX Library
+   - Adafruit ST7735 and ST7789 Library
 
-### Step 2 — Add ESP32 board support
+3. Open `firmware/clawd_status/clawd_status.ino`
 
-1. Open Arduino IDE → **File → Preferences**
-2. In "Additional boards manager URLs" paste:
-   ```
-   https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-   ```
-3. Go to **Tools → Board → Boards Manager**, search `esp32`, install **"esp32 by Espressif Systems"**
+4. Board settings:
+   - Board: **ESP32C3 Dev Module**
+   - USB CDC On Boot: **Enabled**
+   - CPU Frequency: **160 MHz**
+   - Upload Speed: **921600**
 
-### Step 3 — Install libraries
+5. Upload!
 
-Go to **Tools → Library Manager** and install both:
+### 2. Install the daemon and hooks
 
-- `Adafruit GFX Library`
-- `Adafruit ST7735 and ST7789 Library`
-
-### Step 4 — Configure board settings
-
-Go to **Tools** and set:
-
-| Setting         | Value                   |
-| --------------- | ----------------------- |
-| Board           | ESP32C3 Dev Module      |
-| USB CDC On Boot | **Enabled** ← important |
-| CPU Frequency   | 160 MHz                 |
-| Upload Speed    | 921600                  |
-
-### Step 5 — Upload the sketch
-
-1. Clone or download this repo
-2. Open `clawd_mochi/clawd_mochi.ino` in Arduino IDE
-3. Connect the ESP32 via USB-C
-4. Select the correct port under **Tools → Port**
-5. Click **Upload** (→ arrow button)
-6. Wait for "Hard resetting via RTS pin..." — this means success
-
----
-
-## How to use it
-
-### Connect and open the controller
-
-1. Power the ESP32 via USB-C (any USB charger or power bank)
-2. Wait ~3 seconds for the boot animation to finish
-3. On your phone or computer, go to **WiFi settings**
-4. Connect to the network: **`ClaWD-Mochi`** · password: **`clawd1234`**
-5. Open a browser and go to **`http://192.168.4.1`**
-
-You should see the web controller:
-
-<img src="pics/clawd_mochi_webpage.jpeg" alt="Webpage view" width="500"/>
-
-### Controller features
-
-| Button / control   | What it does                                    |
-| ------------------ | ----------------------------------------------- |
-| Normal eyes        | Plays wiggle + blink animation                  |
-| Squish eyes        | Plays open/close animation                      |
-| Claude Code        | Shows code display, opens terminal              |
-| Canvas             | Enter drawing mode — draw on display from phone |
-| Speed slider       | Controls animation speed (slow / normal / fast) |
-| Background color   | Changes background color of all views           |
-| Pen color          | Sets drawing color for canvas                   |
-| Display on/off     | Toggles the backlight                           |
-| ✓ done (in canvas) | Exits canvas mode                               |
-
----
-
-## 3D case
-
-The electronics case (body + back) is in the `clawd_mochi` model folder:
-
-| File                                                                                 | Description                               |
-| ------------------------------------------------------------------------------------ | ----------------------------------------- |
-| [`./models/clawd_mochi/clawd_mochi_v1.stl`](./models/clawd_mochi/clawd_mochi_v1.stl) | Main case layout with body and back parts |
-
-### Print settings
-
-| Setting      | Value                               |
-| ------------ | ----------------------------------- |
-| Material     | PLA or PETG                         |
-| Layer height | 0.15–0.20 mm                        |
-| Infill       | 15% gyroid                          |
-| Supports     | Yes — for display window overhang   |
-| Orientation  | Face-down, flat back on build plate |
-
-Suggested colors: orange PLA for body, matte black for back plate.
-
-You can also download the models from MakerWorld: [https://makerworld.com/en/models/2559505-clawd-mochi-physical-claude-code-mascot#profileId-2820000](https://makerworld.com/en/models/2559505-clawd-mochi-physical-claude-code-mascot#profileId-2820000)
-
-### 3D Clawd (no electronics)
-
-If you just want a display piece, use the separate 3D Clawd model (no screen or electronics cutouts).
-
-<img src="pics/clawd_3D_4_3.png" alt="3D printed Clawd model" width="500"/>
-
-Model file: [`./models/clawd_3d/Clawd_3D_no_AMS.stl`](./models/clawd_3d/Clawd_3D_no_AMS.stl)
-
-You can also download the models from MakerWorld: [https://makerworld.com/en/models/2576503-clawd-claude-code-mascot#profileId-2841183](https://makerworld.com/en/models/2576503-clawd-claude-code-mascot#profileId-2841183)
-
----
-
-## Assembly tips
-
-1. Print the case file (body + back) and test-fit the display before gluing anything
-2. Thread the 8 wires through the back plate slot before soldering
-3. Use double-sided tape to fix the ESP32 against the inside of the back plate
-4. Secure the display with 2× M2×6mm screws through the bezel holes
-5. Route the USB-C cable through the back plate slot and snap the back on
-
----
-
-## Customisation
-
-### Eye size and position
-
-Edit these constants near the top of `clawd_mochi.ino`:
-
-```cpp
-#define EYE_W   30    // eye width in pixels
-#define EYE_H   60    // eye height in pixels
-#define EYE_GAP 120   // gap between eyes
-#define EYE_OX  0     // horizontal offset
-#define EYE_OY  40    // vertical offset upward
+```bash
+# Clone and run the installer
+cd hooks
+./install.sh
 ```
 
-### Logo animation duration
+This will:
+- Copy the daemon and hook script to `~/.clawd/`
+- Install `pyserial` if needed
+- Create default config at `~/.clawd/config.json`
+- Add hooks to `~/.claude/settings.json`
+- Start the daemon via launchd (macOS)
 
-```cpp
-// In animLogoReveal() — how long logo holds after animation
-delay(1500);       // milliseconds — change this number
+### 3. Plug in and go
 
-// Speed of the reveal drawing stroke by stroke
-delay(speedMs(8)); // lower = faster
+Connect the ESP32 via USB-C. The daemon auto-detects the serial port. Start using Claude Code — the expressions will change automatically!
+
+## Configuration
+
+Edit `~/.clawd/config.json`:
+
+```json
+{
+  "serial_port": "auto",
+  "baud_rate": 115200,
+  "idle_timeout": 300,
+  "brightness": 255,
+  "speed": 2
+}
 ```
 
----
+| Setting | Description | Default |
+|---|---|---|
+| `serial_port` | `"auto"` or explicit path like `"/dev/cu.usbmodem1101"` | `"auto"` |
+| `baud_rate` | Serial baud rate | `115200` |
+| `idle_timeout` | Seconds before switching to inactive | `300` (5 min) |
+| `brightness` | Display brightness (0-255) | `255` |
+| `speed` | Animation speed (1=slow, 2=normal, 3=fast) | `2` |
 
-## Contributing
+After editing, send `reload` to the daemon:
+```bash
+echo "reload" | python3 -c "import socket,os; s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM); s.connect(os.path.expanduser('~/.clawd/clawd.sock')); s.sendall(b'reload\n'); s.close()"
+```
 
-Contributions are very welcome! Here are some ideas:
+## Serial protocol
 
-- **New animations** — add new expressions, transitions, or idle behaviors
-- **New views** — weather display, clock, notification badges, pixel art scenes
-- **Sound** — add a small buzzer for sound effects
-- **Sensors** — connect a touch sensor or button for physical interaction
-- **OTA updates** — add over-the-air firmware updates
-- **MQTT / Home Assistant** — connect to smart home platforms
+You can test the ESP32 directly via any serial monitor at 115200 baud:
 
-To contribute: fork the repo, make your changes, and open a pull request. Please keep the single-file structure (`clawd_mochi.ino`) so it stays easy for beginners to flash.
+```
+PING              → PONG
+STATE:working     → OK:STATE:working
+STATE:attention   → OK:STATE:attention
+STATE:inactive    → OK:STATE:inactive
+SET:brightness:128 → OK:SET:brightness:128
+SET:speed:3       → OK:SET:speed:3
+SET:bgcolor:DA1100 → OK:SET:bgcolor:DA1100
+```
+
+## Uninstall
+
+```bash
+cd hooks
+./install.sh --uninstall
+```
+
+## Project structure
+
+```
+clawd-mochi/
+├── firmware/clawd_status/    # ESP32 Arduino firmware
+│   └── clawd_status.ino
+├── daemon/                   # Host-side Python daemon
+│   ├── clawd_daemon.py
+│   ├── requirements.txt
+│   └── com.clawd.status-daemon.plist
+├── hooks/                    # Claude Code hook script + installer
+│   ├── clawd_hook.sh
+│   └── install.sh
+├── clawd_mochi.ino           # Original WiFi version (preserved)
+├── models/                   # 3D printable case files
+└── pics/                     # Project photos
+```
+
+## Original version
+
+The original `clawd_mochi.ino` in the root is the standalone WiFi-controlled version with a web interface, terminal, drawing canvas, and multiple expression views. It still works independently — just flash it instead of the status indicator firmware.
+
+## 3D printing
+
+The same case from [MakerWorld](https://makerworld.com/en/models/2559505-clawd-mochi-physical-claude-code-mascot#profileId-2820000) works for both versions. Print in PLA/PETG, ~30g of filament.
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
-
-**Note:** 3D models and media assets are licensed under **CC BY-NC-SA 4.0**.
+- **Code:** MIT License
+- **3D models and media assets:** CC BY-NC-SA 4.0
