@@ -1,15 +1,15 @@
 /*
  * ╔══════════════════════════════════════════════════════════════╗
  *   CLAWD STATUS — Claude Code Status Indicator
- *   ESP32-C3 Super Mini + ST7789 1.54" 240×240
+ *   Seeed Studio XIAO ESP32-C3 + ST7789 1.54" 240×240
  *
- *   Wiring:
- *     SDA → GPIO 10  (hardware SPI MOSI)
- *     SCL → GPIO 8   (hardware SPI SCK)
- *     RST → GPIO 2
- *     DC  → GPIO 1
- *     CS  → GPIO 4
- *     BL  → GPIO 3
+ *   Wiring (XIAO ESP32-C3 pin labels):
+ *     SDA → D10 / GPIO 10  (hardware SPI MOSI)
+ *     SCL → D8  / GPIO 8   (hardware SPI SCK)
+ *     RES → D0  / GPIO 2   (Reset)
+ *     DC  → D3  / GPIO 5   (Data/Command)
+ *     CS  → D2  / GPIO 4   (Chip Select)
+ *     BL  → D1  / GPIO 3   (Backlight PWM)
  *     VCC → 3V3
  *     GND → GND
  *
@@ -32,10 +32,11 @@
 #include <math.h>
 
 // ── Pins ──────────────────────────────────────────────────────
-#define TFT_CS  4
-#define TFT_DC  1
-#define TFT_RST 2
-#define TFT_BLK 3
+// XIAO ESP32-C3 pin mapping (D-labels → GPIO numbers)
+#define TFT_CS  4    // D2
+#define TFT_DC  5    // D3  (GPIO 1 is not exposed on XIAO)
+#define TFT_RST 2    // D0
+#define TFT_BLK 3    // D1
 
 Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 

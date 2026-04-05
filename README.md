@@ -7,7 +7,7 @@
 
 A physical desk companion inspired by **Clawd** — the pixel-crab mascot of Claude Code by Anthropic. An ESP32-C3 drives a 1.54" color TFT display and shows you what Claude is doing at a glance.
 
-**Cost: ~$6-8 · Build time: ~1 hour · Skill level: Beginner**
+**Built for the Seeed Studio XIAO ESP32-C3 · Cost: ~$8-10 · Build time: ~1 hour · Skill level: Beginner**
 
 ---
 
@@ -46,25 +46,27 @@ Claude Code ──hooks──▶ clawd_hook.sh ──socket──▶ clawd_daemo
 
 | Part | ~Cost |
 |---|---|
-| ESP32-C3 Super Mini | $2.50 |
+| Seeed Studio XIAO ESP32-C3 | $4.99 |
 | ST7789 1.54" TFT (240x240, SPI) | $3.00 |
 | 8x jumper wires (8-10 cm) | $0.50 |
 | 3D printed case | ~$1.00 |
 
-**Total: ~$6-8**
+**Total: ~$8-10**
 
 ## Wiring
 
-| Display Pin | ESP32-C3 GPIO | Purpose |
-|---|---|---|
-| VCC | 3V3 | Power (3.3V ONLY) |
-| GND | GND | Ground |
-| SDA | GPIO 10 | MOSI (hardware SPI) |
-| SCL | GPIO 8 | SCK (hardware SPI) |
-| RES | GPIO 2 | Reset |
-| DC | GPIO 1 | Data/Command |
-| CS | GPIO 4 | Chip select |
-| BL | GPIO 3 | Backlight (PWM) |
+| Display Pin | XIAO Pin | GPIO | Purpose |
+|---|---|---|---|
+| VCC | 3V3 | — | Power (3.3V ONLY) |
+| GND | GND | — | Ground |
+| SDA | D10 | GPIO 10 | MOSI (hardware SPI) |
+| SCL | D8 | GPIO 8 | SCK (hardware SPI) |
+| RES | D0 | GPIO 2 | Reset |
+| DC | D3 | GPIO 5 | Data/Command |
+| CS | D2 | GPIO 4 | Chip select |
+| BL | D1 | GPIO 3 | Backlight (PWM) |
+
+> **Note:** The XIAO ESP32-C3 does not expose GPIO 1 on its pin headers. DC is mapped to GPIO 5 (D3) instead.
 
 ## Setup
 
@@ -83,7 +85,7 @@ Claude Code ──hooks──▶ clawd_hook.sh ──socket──▶ clawd_daemo
 3. Open `firmware/clawd_status/clawd_status.ino`
 
 4. Board settings:
-   - Board: **ESP32C3 Dev Module**
+   - Board: **XIAO_ESP32C3** (Seeed Studio XIAO ESP32C3)
    - USB CDC On Boot: **Enabled**
    - CPU Frequency: **160 MHz**
    - Upload Speed: **921600**
