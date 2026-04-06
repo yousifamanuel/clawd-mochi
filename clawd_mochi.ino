@@ -63,8 +63,12 @@ bool     busy         = false;
 bool     backlightOn  = true;
 uint8_t  animSpeed    = 1;   // 1=slow(default) 2=normal 3=fast
 
-uint16_t animBgColor  = 0;   // background for eye/logo animations
+uint16_t animBgColor  = 0;   // background for eye/logo animations (set in setup)
 uint16_t drawBgColor  = 0;   // background for canvas
+
+String   statusText   = "";  // text shown below eyes
+uint8_t  statusSize   = 2;   // font size for status text
+uint16_t statusColor  = 0;   // colour for status text (0 = use C_BLACK)
 
 // ── Terminal ──────────────────────────────────────────────────
 #define TERM_COLS      15
@@ -210,7 +214,7 @@ void setBacklight(bool on) {
 
 void initColours() {
   // C_ORANGE = tft.color565(170, 72, 28);
-  C_ORANGE = tft.color565(218, 17, 0);
+  C_ORANGE = tft.color565(219, 99, 0);
   C_DARKBG = tft.color565(10,  12,  16);
   C_MUTED  = tft.color565(90,  88,  86);
   C_GREEN  = tft.color565(80, 220, 130);
@@ -248,6 +252,30 @@ inline int16_t eyeRX(int16_t ox) { return eyeLX(ox) + EYE_W + EYE_GAP; }
 inline int16_t eyeY()            { return (DISP_H - EYE_H) / 2 - EYE_OY; }
 inline int16_t eyeCY()           { return eyeY() + EYE_H / 2; }
 
+void drawStatusText() {
+  if (statusText.length() == 0) return;
+  tft.setTextSize(statusSize);
+  tft.setTextColor(statusColor ? statusColor : C_BLACK);
+  int16_t charW = 6 * statusSize;
+  int16_t lineH = 8 * statusSize + 2;
+  int16_t maxChars = DISP_W / charW;
+  if (maxChars < 1) maxChars = 1;
+
+  int16_t len = statusText.length();
+  int16_t lines = (len + maxChars - 1) / maxChars;
+  int16_t totalH = lines * lineH;
+  int16_t startY = DISP_H - totalH - 8;
+
+  for (int16_t i = 0; i < lines; i++) {
+    String line = statusText.substring(i * maxChars, min((int)((i + 1) * maxChars), (int)len));
+    int16_t tw = line.length() * charW;
+    int16_t x = (DISP_W - tw) / 2;
+    if (x < 0) x = 0;
+    tft.setCursor(x, startY + i * lineH);
+    tft.print(line);
+  }
+}
+
 void drawNormalEyes(int16_t ox = 0, bool blink = false) {
   tft.fillScreen(animBgColor);
   const int16_t lx = eyeLX(ox), rx = eyeRX(ox), ey = eyeY();
@@ -258,6 +286,7 @@ void drawNormalEyes(int16_t ox = 0, bool blink = false) {
     tft.fillRect(lx, ey + EYE_H / 2 - 3, EYE_W, 6, C_BLACK);
     tft.fillRect(rx, ey + EYE_H / 2 - 3, EYE_W, 6, C_BLACK);
   }
+  drawStatusText();
 }
 
 void drawChevron(int16_t cx, int16_t cy, int16_t arm, int16_t reach,
@@ -287,6 +316,7 @@ void drawSquishEyes(bool closed = false) {
     tft.fillRect(lx, cy - 5, EYE_W, 10, C_BLACK);
     tft.fillRect(rx, cy - 5, EYE_W, 10, C_BLACK);
   }
+  drawStatusText();
 }
 
 void drawCodeView() {
@@ -1061,6 +1091,10 @@ void setup() {
   tft.setCursor(12, 94);  tft.print("192.168.4.1");
   tft.setTextColor(C_MUTED);  tft.setTextSize(1);
   tft.setCursor(12, 124); tft.print("press any button to start");
+  delay(10000);
+
+  currentView = VIEW_EYES_NORMAL;
+  animNormalEyes();
 
   // ── Register routes ────────────────────────────────────────
   server.on("/",            HTTP_GET, routeRoot);
@@ -1084,4 +1118,145 @@ void setup() {
 //  LOOP
 // ═════════════════════════════════════════════════════════════
 
-void loop() { server.handleClient(); }
+// ── Serial command handler ───────────────────────────────────
+String serialBuf = "";
+
+void handleSerial() {
+  while (Serial.available()) {
+    char c = Serial.read();
+    if (c == '\n' || c == '\r') {
+      serialBuf.trim();
+      if (serialBuf.length() == 0) { serialBuf = ""; return; }
+
+      // single-char commands: w s d a q
+      if (serialBuf.length() == 1) {
+        char k = serialBuf[0];
+        if (termMode && k == 'q') { termMode = false; drawCodeView(); }
+        else switch (k) {
+          case 'w': currentView = VIEW_EYES_NORMAL; animNormalEyes(); break;
+          case 's': currentView = VIEW_EYES_SQUISH; animSquishEyes(); break;
+          case 'd': currentView = VIEW_CODE; drawCodeView();
+                    termMode = true; termClear(); termFullRedraw(); break;
+          case 'a': currentView = VIEW_EYES_NORMAL; animLogoReveal(); break;
+        }
+        Serial.println("ok");
+      }
+      // t<text> — type in terminal
+      else if (serialBuf[0] == 't') {
+        if (!termMode) {
+          currentView = VIEW_CODE; drawCodeView();
+          termMode = true; termClear(); termFullRedraw();
+        }
+        for (uint16_t i = 1; i < serialBuf.length(); i++) termAddChar(serialBuf[i]);
+        Serial.println("ok");
+      }
+      // bg#RRGGBB
+      else if (serialBuf.startsWith("bg")) {
+        String hex = serialBuf.substring(2);
+        animBgColor = hexToRgb565(hex);
+        drawBgColor = animBgColor;
+        switch (currentView) {
+          case VIEW_EYES_NORMAL: drawNormalEyes(); break;
+          case VIEW_EYES_SQUISH: drawSquishEyes(); break;
+          case VIEW_CODE:        drawCodeView();   break;
+          case VIEW_DRAW:        tft.fillScreen(drawBgColor); break;
+        }
+        Serial.println("ok");
+      }
+      // speed1 / speed2 / speed3
+      else if (serialBuf.startsWith("speed")) {
+        animSpeed = constrain(serialBuf.substring(5).toInt(), 1, 3);
+        Serial.println("ok");
+      }
+      // canvas — switch to draw mode
+      else if (serialBuf == "canvas") {
+        currentView = VIEW_DRAW; termMode = false;
+        tft.fillScreen(drawBgColor);
+        Serial.println("ok");
+      }
+      // line x1,y1,x2,y2,#RRGGBB — draw line on canvas
+      else if (serialBuf.startsWith("line ")) {
+        String args = serialBuf.substring(5);
+        int c1 = args.indexOf(',');
+        int c2 = args.indexOf(',', c1+1);
+        int c3 = args.indexOf(',', c2+1);
+        int c4 = args.indexOf(',', c3+1);
+        if (c4 > 0) {
+          int16_t x1 = args.substring(0, c1).toInt();
+          int16_t y1 = args.substring(c1+1, c2).toInt();
+          int16_t x2 = args.substring(c2+1, c3).toInt();
+          int16_t y2 = args.substring(c3+1, c4).toInt();
+          uint16_t col = hexToRgb565(args.substring(c4+1));
+          tft.drawLine(x1, y1, x2, y2, col);
+          tft.drawLine(x1+1, y1, x2+1, y2, col);
+        }
+        Serial.println("ok");
+      }
+      // logo
+      else if (serialBuf == "logo") {
+        currentView = VIEW_EYES_NORMAL;
+        animLogoReveal();
+        Serial.println("ok");
+      }
+      // img — receive raw RGB565 image (280x240, 134400 bytes)
+      else if (serialBuf == "img") {
+        currentView = VIEW_DRAW; termMode = false;
+        tft.startWrite();
+        tft.setAddrWindow(0, 0, DISP_W, DISP_H);
+        Serial.println("ready");
+        uint32_t total = (uint32_t)DISP_W * DISP_H * 2;
+        uint32_t received = 0;
+        uint8_t buf[512];
+        unsigned long lastData = millis();
+        while (received < total && millis() - lastData < 10000) {
+          int avail = Serial.available();
+          if (avail > 0) {
+            int toRead = min((int)sizeof(buf), min(avail, (int)(total - received)));
+            Serial.readBytes(buf, toRead);
+            tft.writePixels((uint16_t*)buf, toRead / 2);
+            received += toRead;
+            lastData = millis();
+          }
+        }
+        tft.endWrite();
+        Serial.printf("done %lu\n", received);
+      }
+      // status[N] [-c#RRGGBB] <text> — show text below eyes
+      else if (serialBuf.startsWith("status")) {
+        uint8_t idx = 6;
+        if (idx < serialBuf.length() && serialBuf[idx] >= '1' && serialBuf[idx] <= '4') {
+          statusSize = serialBuf[idx] - '0';
+          idx++;
+        }
+        String rest = serialBuf.substring(idx);
+        rest.trim();
+        if (rest.startsWith("-c")) {
+          int sp = rest.indexOf(' ', 2);
+          if (sp > 0) {
+            statusColor = hexToRgb565(rest.substring(2, sp));
+            rest = rest.substring(sp + 1);
+          } else {
+            statusColor = hexToRgb565(rest.substring(2));
+            rest = "";
+          }
+        }
+        statusText = rest;
+        statusText.trim();
+        if (currentView == VIEW_EYES_NORMAL) drawNormalEyes();
+        else if (currentView == VIEW_EYES_SQUISH) drawSquishEyes();
+        Serial.println("ok");
+      }
+      else {
+        Serial.println("unknown cmd");
+      }
+      serialBuf = "";
+    } else {
+      serialBuf += c;
+    }
+  }
+}
+
+void loop() {
+  server.handleClient();
+  handleSerial();
+}
