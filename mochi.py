@@ -25,7 +25,8 @@ import serial.tools.list_ports
 
 
 DEFAULT_BAUD = 115200
-PORT_VID_PID = None  # auto-detect ESP32
+DISP_W = 240
+DISP_H = 240
 
 
 def find_port():
@@ -63,10 +64,10 @@ def send_cmd(port, cmd, baud=DEFAULT_BAUD):
 
 
 def send_image(port, image_path, tint=None, baud=DEFAULT_BAUD):
-    """Read image, resize to 280x240, convert to RGB565, send over serial."""
+    """Read image, resize to display size, convert to RGB565, send over serial."""
     from PIL import Image
     img = Image.open(image_path).convert("RGB")
-    img = img.resize((280, 240), Image.LANCZOS)
+    img = img.resize((DISP_W, DISP_H), Image.LANCZOS)
 
     # Parse tint colour
     tr, tg, tb = 0, 0, 0
@@ -74,12 +75,12 @@ def send_image(port, image_path, tint=None, baud=DEFAULT_BAUD):
         tint = tint.lstrip("#")
         tr, tg, tb = int(tint[0:2], 16), int(tint[2:4], 16), int(tint[4:6], 16)
 
-    # Convert to RGB565 big-endian (ST7789 native format)
+    # Convert to RGB565 little-endian (ESP32 native byte order)
     pixels = img.load()
-    data = bytearray(280 * 240 * 2)
+    data = bytearray(DISP_W * DISP_H * 2)
     idx = 0
-    for y in range(240):
-        for x in range(280):
+    for y in range(DISP_H):
+        for x in range(DISP_W):
             r, g, b = pixels[x, y]
             if tint:
                 # Blend: dark pixels → tint colour, bright pixels → white
