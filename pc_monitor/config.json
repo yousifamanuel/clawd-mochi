@@ -1,0 +1,7 @@
+{
+  "port": 8080,
+  "refresh_interval": 2,
+  "clawd_base_url": "http://192.168.31.239",
+  "status_file": "clawd_status.txt",
+  "push_interval": 1
+}
