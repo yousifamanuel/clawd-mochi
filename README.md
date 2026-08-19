@@ -241,4 +241,4 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yousifamanuel/clawd-mochi)](https://www.star-history.com/#yousifamanuel/clawd-mochi)
+[![Star History Chart](https://star-history.dera.page/svg?repos=yousifamanuel/clawd-mochi)](https://star-history.dera.page/#yousifamanuel/clawd-mochi)
